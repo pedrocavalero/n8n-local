@@ -1,0 +1,145 @@
+{
+  "name": "YouTube to WordPress Blog Post",
+  "nodes": [
+    {
+      "parameters": {
+        "events": "message.text"
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_BOT_API_TOKEN_ID",
+          "name": "Telegram Bot API Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.text;\nlet videoId = '';\nif (url.includes('youtube.com/watch?v=')) {\n  videoId = url.split('v=')[1].split('&')[0];\n} else if (url.includes('youtu.be/')) {\n  videoId = url.split('youtu.be/')[1].split('?')[0];\n}\nreturn { videoId: videoId };"
+      },
+      "name": "Extract Video ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "python",
+        "args": [
+          "/home/node/.n8n/scripts/get_transcript.py",
+          "{{ $json.videoId }}"
+        ],
+        "options": {}
+      },
+      "name": "Execute youtube-transcript-api",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Based on the following video transcript, write a comprehensive blog post. The post should have a clear title, an introduction, several paragraphs discussing the key points, and a conclusion. \n\nTranscript: {{ $json.stdout }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "OpenAI",
+      "type": "n8n-nodes-base.openAiChat",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_API_KEY_ID",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "title": "New Blog Post from YouTube Video",
+        "content": "{{ $json.choices[0].message.content }}",
+        "status": "draft",
+        "options": {}
+      },
+      "name": "WordPress",
+      "type": "n8n-nodes-base.wordPress",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "wordPressApi": {
+          "id": "YOUR_WORDPRESS_CREDENTIALS_ID",
+          "name": "WordPress Credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Video ID",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Extract Video ID": {
+      "main": [
+        [
+          {
+            "node": "Execute youtube-transcript-api",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Execute youtube-transcript-api": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "WordPress",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "1"
+}
